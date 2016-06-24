@@ -70,7 +70,7 @@ else
     OVERLAP_OFFSET_START=$6
 fi
 
-# Initial offset to test 
+# Overlap test height 
 if [ "$7" = "" ] ; then
     OVERLAP_TEST_HEIGHT=$(expr $DENSITY \/ 160 \* 20) # 20 dp
 else

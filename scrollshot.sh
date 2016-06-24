@@ -65,21 +65,21 @@ DENSITY=$(echo $DENSITY | grep -o "[0-9]\+")
 
 # Initial offset to test 
 if [ "$6" = "" ] ; then
-    OVERLAP_OFFSET_START=-$(expr $DENSITY \/ 160 \* 4) # 4 dp
+    OVERLAP_OFFSET_START=-$(expr $DENSITY \* 4 \/ 160) # 4 dp
 else
     OVERLAP_OFFSET_START=$6
 fi
 
 # Overlap test height 
 if [ "$7" = "" ] ; then
-    OVERLAP_TEST_HEIGHT=$(expr $DENSITY \/ 160 \* 20) # 20 dp
+    OVERLAP_TEST_HEIGHT=$(expr $DENSITY \* 20 \/ 160) # 20 dp
 else
     OVERLAP_TEST_HEIGHT=$7
 fi
 
 # Final offset to test 
 if [ "$8" = "" ] ; then
-    OVERLAP_OFFSET_END=$(expr $DENSITY \/ 160 \* 4) # 4 dp
+    OVERLAP_OFFSET_END=$(expr $DENSITY \* 4 \/ 160) # 4 dp
 else
     OVERLAP_OFFSET_END=$8
 fi
@@ -87,12 +87,28 @@ fi
 # Set some overlap test variables
 OVERLAP_TEST_THRESHOLD="0.01" # 1% root mean squared difference (standard deviation)
 
-# Wake the device if necessary
-if [ "$(adb shell "dumpsys power | grep mWakefulness=Asleep")" != "" ] ; then
-    adb shell input keyevent 26
+# Get version number
+VERSION=$(adb shell getprop ro.build.version.release)
+MAJOR_VERSION=$(echo $VERSION | cut -c 1)
+MINOR_VERSION=$(echo $VERSION | cut -c 3)
+# Test if integer, then test if >= 5.0 (Lollipop)
+if [[ "$MAJOR_VERSION" =~ ^-?[0-9]+$ ]] ; then
+    if [ "$MAJOR_VERSION" -ge "5" ] ; then
+        if [ "$(adb shell dumpsys power | grep mWakefulness=Asleep)" != "" ] ; then
+            # Wake the device if necessary
+            adb shell input keyevent 26
 
-    # Unlocks the screen
-    adb shell input keyevent 82
+            # Unlocks the screen
+            adb shell input keyevent 82
+        fi
+    elif [ "$(adb shell dumpsys power | grep mUserActivityAllowed=true)" == "" ] ; then
+        # Wake the device if necessary
+        adb shell input keyevent 26
+
+        echo "Device is locked."
+
+        exit 1
+    fi
 fi
 
 # Sleep, just in case.
@@ -139,7 +155,18 @@ fi
 for i in `seq -s " " 1 $COUNT`; do
 
     # Scroll
-    adb shell "input touchscreen swipe 100 $VERTICAL 100 0 2000"
+    if [[ "$MAJOR_VERSION" =~ ^-?[0-9]+$ ]] ; then
+        if [ "$MAJOR_VERSION" -ge "5" ] ; then
+            adb shell "input touchscreen swipe 100 $VERTICAL 100 0 2000"
+        elif [ "$MAJOR_VERSION" -ge "4" ] && [ "$MINOR_VERSION" -gt "1" ] ; then
+            adb shell "input touchscreen swipe 100 $VERTICAL 100 0 2000" # Same as above
+        else
+            adb shell "input swipe 100 $VERTICAL 100 0"
+        fi
+    else
+        # Assume new version.
+        adb shell "input touchscreen swipe 100 $VERTICAL 100 0 2000"
+    fi
 
     # Sleep, so that the scrollbar disappears.
     sleep 1
@@ -185,10 +212,10 @@ for i in `seq -s " " 1 $COUNT`; do
                 else 
                     FOOTER_KEEP=0
                 fi
-            elif [ $FOOTER_KEEP -le $(expr $DENSITY \/ 160 \* 48 \+ $DENSITY \/ 160 \* 8) ] && [ $FOOTER_KEEP -gt $(expr $DENSITY \/ 160 \* 48 \- $DENSITY \/ 160 \* 8) ] ; then
+            elif [ $FOOTER_KEEP -le $(expr $DENSITY \* 48 \/ 160 \+ $DENSITY \* 8 \/ 160) ] && [ $FOOTER_KEEP -gt $(expr $DENSITY \* 48 \/ 160 \- $DENSITY \* 8 \/ 160) ] ; then
                 # If it's really close to the height of the navigation bar (+/- 8dp)
                 # Make it the height of th navigation bar
-                FOOTER_KEEP=$(expr $DENSITY \/ 160 \* 48)
+                FOOTER_KEEP=$(expr $DENSITY \* 48 \/ 160)
             elif [ ${FOOTER_KEEP} -gt 0 ] ; then
                 FOOTER_KEEP=$(expr $FOOTER_KEEP \+ 1)
             else
